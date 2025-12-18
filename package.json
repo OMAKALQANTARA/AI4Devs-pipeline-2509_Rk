@@ -6,5 +6,6 @@
     "schema": "backend/prisma/schema.prisma"
   },
   "devDependencies": {
+    "cypress": "^15.8.1"
   }
 }
