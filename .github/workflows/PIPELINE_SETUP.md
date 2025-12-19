@@ -4,11 +4,13 @@ This document explains how to configure the CI/CD pipeline for deploying to AWS 
 
 ## Pipeline Overview
 
-The pipeline consists of three main jobs:
+The pipeline consists of five main jobs:
 
 1. **Backend Tests** - Runs `npm test` in the backend directory
 2. **Backend Build** - Runs `npm run build` in the backend directory
-3. **Frontend Deploy** - Builds the React app and deploys it to AWS EC2
+3. **Backend Deploy** - Deploys the backend to AWS EC2 (runs first)
+4. **Frontend Build & Deploy** - Builds the React app and deploys it to AWS EC2 (runs after backend)
+5. **Pipeline Summary** - Generates a summary of all job statuses
 
 ## Required GitHub Secrets
 
@@ -20,33 +22,25 @@ To enable the pipeline, you need to configure the following secrets in your GitH
 
 | Secret Name | Description | Example Value |
 |-------------|-------------|---------------|
-| `AWS_ACCESS_KEY_ID` | AWS IAM user access key ID | `AKIAIOSFODNN7EXAMPLE` |
-| `AWS_ACCESS_KEY` | AWS IAM user secret access key | `wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY` |
-| `AWS_REGION` | AWS region where your EC2 instance is located | `us-east-1` |
-| `EC2_INSTANCE` | Public IP or DNS of your EC2 instance | `ec2-XX-XXX-XXX-XX.compute-1.amazonaws.com` |
+| `EC2_INSTANCE` | Public IP or DNS of your EC2 instance | `ec2-XX-XXX-XXX-XX.compute-1.amazonaws.com` or `12.34.56.78` |
 | `EC2_USER` | SSH username for EC2 instance | `ubuntu` or `ec2-user` |
 | `EC2_SSH_PRIVATE_KEY` | Private SSH key for EC2 access | Content of your `.pem` file |
-| `DEPLOY_PATH` | (Optional) Path where to deploy on EC2 | `/var/www/html` (default) |
+| `BACKEND_DEPLOY_PATH` | (Optional) Path where to deploy backend | `/home/ec2-user/backend` (default) |
+| `FRONTEND_DEPLOY_PATH` | (Optional) Path where to deploy frontend | `/var/www/html` (default) |
 
 ## Detailed Setup Instructions
 
-### 1. AWS Credentials Setup
-
-Create an IAM user with programmatic access:
-1. Go to AWS Console > IAM > Users > Add User
-2. Enable "Programmatic access"
-3. Attach policies: `AmazonEC2FullAccess` (or create custom policy with minimal permissions)
-4. Save the Access Key ID and Secret Access Key
-
-### 2. EC2 Instance Setup
+### 1. EC2 Instance Setup
 
 Ensure your EC2 instance:
 - Has a public IP or Elastic IP
-- Security group allows SSH (port 22) from GitHub Actions IPs
-- Has web server installed (nginx/apache) if serving static files
+- Security group allows SSH (port 22) from GitHub Actions IPs (0.0.0.0/0 for simplicity, or restrict to GitHub Actions IP ranges)
+- Security group allows HTTP (port 80) and HTTPS (port 443) for web traffic
+- Has web server installed (nginx/apache) for serving frontend
+- Has Node.js installed for running backend
 - SSH key pair is available
 
-### 3. SSH Key Configuration
+### 2. SSH Key Configuration
 
 ```bash
 # Your EC2 SSH private key should look like:
@@ -58,7 +52,7 @@ MIIEpAIBAAKCAQEA...
 
 Copy the **entire content** of your `.pem` file (including BEGIN and END lines) into the `EC2_SSH_PRIVATE_KEY` secret.
 
-### 4. EC2 Server Preparation
+### 3. EC2 Server Preparation
 
 On your EC2 instance, prepare the deployment directory. Choose the instructions based on your Linux distribution:
 
@@ -153,7 +147,48 @@ cat /etc/os-release
 uname -a
 ```
 
-### 5. Test the Pipeline
+### 4. Install Node.js on EC2 (for Backend)
+
+The backend requires Node.js to run. Install it on your EC2 instance:
+
+#### For Amazon Linux 2:
+```bash
+# Install Node.js 18.x using nvm
+curl -o- https://raw.githubusercontent.com/nvm-sh/nvm/v0.39.0/install.sh | bash
+source ~/.bashrc
+nvm install 18
+nvm use 18
+nvm alias default 18
+
+# Verify installation
+node --version
+npm --version
+```
+
+#### For Ubuntu:
+```bash
+# Install Node.js 18.x
+curl -fsSL https://deb.nodesource.com/setup_18.x | sudo -E bash -
+sudo apt-get install -y nodejs
+
+# Verify installation
+node --version
+npm --version
+```
+
+### 5. Optional: Setup Process Manager (PM2)
+
+To keep your backend running continuously:
+
+```bash
+# Install PM2 globally
+npm install -g pm2
+
+# PM2 will be used to manage your backend application
+# The pipeline can restart it automatically after deployment
+```
+
+### 6. Test the Pipeline
 
 After configuring all secrets:
 1. Push changes to `main` or `develop` branch
@@ -167,7 +202,15 @@ The pipeline runs on:
 - **Push** to `main` or `develop` branches
 - **Pull Request** to `main` or `develop` branches
 
-**Note:** Deployment to EC2 only happens on pushes to the `main` branch.
+**Note:** Deployment to EC2 (both backend and frontend) only happens on pushes to the `main` branch.
+
+## Deployment Order
+
+The pipeline deploys in the following order:
+1. **Backend** is deployed first to `/home/ec2-user/backend` (or custom path)
+2. **Frontend** is deployed second to `/var/www/html` (or custom path)
+
+This ensures the API is available before the frontend that depends on it.
 
 ## Troubleshooting
 
@@ -187,42 +230,69 @@ The pipeline runs on:
    - Ensure `npm run build` completes successfully
    - Check `frontend/build` directory exists after build
 
-4. **AWS Credentials Invalid**
-   - Verify IAM user has necessary permissions
-   - Check if `AWS_ACCESS_KEY_ID` and `AWS_ACCESS_KEY` are correct
-   - Ensure credentials are active and not expired
-
-5. **Package Manager Not Found (apt/yum/dnf)**
+4. **Package Manager Not Found (apt/yum/dnf)**
    - Check your EC2 instance Linux distribution: `cat /etc/os-release`
    - Use the appropriate package manager for your distro (see section 4 above)
    - Ensure you're using the correct username for your distro
 
 ## Optional Enhancements
 
-### Enable Nginx Restart (Uncomment in pipeline):
-If you want to restart nginx after deployment, uncomment this line in the pipeline:
+### Enable Backend Auto-Restart with PM2:
+
+If you want to automatically restart your backend after deployment, uncomment these lines in the pipeline (backend-deploy job):
+
+```yaml
+# pm2 restart backend || pm2 start dist/index.js --name backend
+```
+
+To set this up on your EC2 instance:
+```bash
+# Install PM2
+npm install -g pm2
+
+# Start your backend for the first time
+cd /home/ec2-user/backend
+pm2 start dist/index.js --name backend
+
+# Save PM2 process list
+pm2 save
+
+# Setup PM2 to start on system boot
+pm2 startup
+# Follow the command it provides
+```
+
+### Enable Nginx Restart:
+
+If you want to restart nginx after frontend deployment, uncomment this line in the pipeline (frontend-deploy job):
+
 ```yaml
 # ssh -i deploy_key.pem -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "sudo systemctl restart nginx"
 ```
 
-And configure passwordless sudo for nginx:
+Configure passwordless sudo for nginx:
 ```bash
 # On EC2 instance
 sudo visudo
-# Add: ubuntu ALL=(ALL) NOPASSWD: /bin/systemctl restart nginx
+# Add this line (replace ec2-user with your username):
+ec2-user ALL=(ALL) NOPASSWD: /bin/systemctl restart nginx
 ```
 
-### Custom Deploy Path:
-Set `DEPLOY_PATH` secret to deploy to a custom directory (defaults to `/var/www/html`)
+### Custom Deploy Paths:
+
+- Set `BACKEND_DEPLOY_PATH` secret for backend deployment (default: `/home/ec2-user/backend`)
+- Set `FRONTEND_DEPLOY_PATH` secret for frontend deployment (default: `/var/www/html`)
 
 ## Security Best Practices
 
-1. ✅ Use IAM roles with minimal required permissions
-2. ✅ Rotate AWS access keys regularly
-3. ✅ Keep SSH keys secure and never commit them to repository
-4. ✅ Use separate AWS accounts/users for production and development
-5. ✅ Enable MFA on AWS IAM users
-6. ✅ Restrict EC2 security group SSH access to specific IP ranges
+1. ✅ Keep SSH keys secure and never commit them to repository
+2. ✅ Rotate SSH keys regularly
+3. ✅ Use separate EC2 instances for production and development
+4. ✅ Restrict EC2 security group SSH access to GitHub Actions IP ranges when possible
+5. ✅ Use environment-specific branches (main for production, develop for staging)
+6. ✅ Enable EC2 instance monitoring and CloudWatch logs
+7. ✅ Keep your EC2 instance and packages up to date
+8. ✅ Use HTTPS/SSL certificates for production deployments
 
 ## Support
 
