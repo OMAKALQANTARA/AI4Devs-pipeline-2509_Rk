@@ -22,6 +22,9 @@ To enable the pipeline, you need to configure the following secrets in your GitH
 
 | Secret Name | Description | Example Value |
 |-------------|-------------|---------------|
+| `AWS_ACCESS_ID` | AWS IAM user access key ID | `AKIAIOSFODNN7EXAMPLE` |
+| `AWS_ACCESS_KEY` | AWS IAM user secret access key | `wJalrXUtnFEMI/K7MDENG/bPxRfiCYEXAMPLEKEY` |
+| `AWS_REGION` | AWS region where your EC2 instance is located | `us-east-1` |
 | `EC2_INSTANCE` | Public IP or DNS of your EC2 instance | `ec2-XX-XXX-XXX-XX.compute-1.amazonaws.com` or `12.34.56.78` |
 | `EC2_USER` | SSH username for EC2 instance | `ubuntu` or `ec2-user` |
 | `EC2_SSH_PRIVATE_KEY` | Private SSH key for EC2 access | Content of your `.pem` file |
@@ -30,7 +33,15 @@ To enable the pipeline, you need to configure the following secrets in your GitH
 
 ## Detailed Setup Instructions
 
-### 1. EC2 Instance Setup
+### 1. AWS Credentials Setup
+
+Create an IAM user with programmatic access:
+1. Go to AWS Console > IAM > Users > Add User
+2. Enable "Programmatic access"
+3. Attach policies: `AmazonEC2FullAccess` (or create custom policy with minimal permissions)
+4. Save the Access Key ID and Secret Access Key
+
+### 2. EC2 Instance Setup
 
 Ensure your EC2 instance:
 - Has a public IP or Elastic IP
@@ -40,7 +51,7 @@ Ensure your EC2 instance:
 - Has Node.js installed for running backend
 - SSH key pair is available
 
-### 2. SSH Key Configuration
+### 3. SSH Key Configuration
 
 ```bash
 # Your EC2 SSH private key should look like:
@@ -52,7 +63,7 @@ MIIEpAIBAAKCAQEA...
 
 Copy the **entire content** of your `.pem` file (including BEGIN and END lines) into the `EC2_SSH_PRIVATE_KEY` secret.
 
-### 3. EC2 Server Preparation
+### 4. EC2 Server Preparation
 
 On your EC2 instance, prepare the deployment directory. Choose the instructions based on your Linux distribution:
 
@@ -147,7 +158,7 @@ cat /etc/os-release
 uname -a
 ```
 
-### 4. Install Node.js on EC2 (for Backend)
+### 5. Install Node.js on EC2 (for Backend)
 
 The backend requires Node.js to run. Install it on your EC2 instance:
 
@@ -176,7 +187,7 @@ node --version
 npm --version
 ```
 
-### 5. Optional: Setup Process Manager (PM2)
+### 6. Optional: Setup Process Manager (PM2)
 
 To keep your backend running continuously:
 
@@ -188,7 +199,7 @@ npm install -g pm2
 # The pipeline can restart it automatically after deployment
 ```
 
-### 6. Test the Pipeline
+### 7. Test the Pipeline
 
 After configuring all secrets:
 1. Push changes to `main` or `develop` branch
@@ -216,21 +227,27 @@ This ensures the API is available before the frontend that depends on it.
 
 ### Common Issues:
 
-1. **SSH Connection Failed**
+1. **AWS Credentials Error**
+   - Verify `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` are correct
+   - Check if IAM user has necessary permissions
+   - Ensure credentials are active and not expired
+   - Verify `AWS_REGION` matches your EC2 instance region
+
+2. **SSH Connection Failed**
    - Verify EC2 security group allows SSH from GitHub Actions IPs
    - Check if `EC2_INSTANCE` and `EC2_USER` secrets are correct
    - Ensure `EC2_SSH_PRIVATE_KEY` is complete with no extra spaces or line breaks
    - Verify the key format includes BEGIN and END lines
 
-2. **Permission Denied on EC2**
+3. **Permission Denied on EC2**
    - Run: `sudo chown -R $USER:$USER /var/www/html` on EC2
    - Check file permissions: `ls -la /var/www/html`
 
-3. **Build Artifacts Not Found**
+4. **Build Artifacts Not Found**
    - Ensure `npm run build` completes successfully
    - Check `frontend/build` directory exists after build
 
-4. **Package Manager Not Found (apt/yum/dnf)**
+5. **Package Manager Not Found (apt/yum/dnf)**
    - Check your EC2 instance Linux distribution: `cat /etc/os-release`
    - Use the appropriate package manager for your distro (see section 4 above)
    - Ensure you're using the correct username for your distro
@@ -285,14 +302,16 @@ ec2-user ALL=(ALL) NOPASSWD: /bin/systemctl restart nginx
 
 ## Security Best Practices
 
-1. ✅ Keep SSH keys secure and never commit them to repository
-2. ✅ Rotate SSH keys regularly
-3. ✅ Use separate EC2 instances for production and development
-4. ✅ Restrict EC2 security group SSH access to GitHub Actions IP ranges when possible
-5. ✅ Use environment-specific branches (main for production, develop for staging)
-6. ✅ Enable EC2 instance monitoring and CloudWatch logs
-7. ✅ Keep your EC2 instance and packages up to date
-8. ✅ Use HTTPS/SSL certificates for production deployments
+1. ✅ Use IAM roles with minimal required permissions
+2. ✅ Rotate AWS access keys regularly
+3. ✅ Keep SSH keys secure and never commit them to repository
+4. ✅ Use separate AWS accounts/users for production and development
+5. ✅ Enable MFA on AWS IAM users
+6. ✅ Restrict EC2 security group SSH access to GitHub Actions IP ranges when possible
+7. ✅ Use environment-specific branches (main for production, develop for staging)
+8. ✅ Enable EC2 instance monitoring and CloudWatch logs
+9. ✅ Keep your EC2 instance and packages up to date
+10. ✅ Use HTTPS/SSL certificates for production deployments
 
 ## Support
 

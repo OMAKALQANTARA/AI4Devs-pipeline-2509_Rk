@@ -27,10 +27,13 @@
 
 Go to your repository: `Settings > Secrets and variables > Actions > New repository secret`
 
-Add these **3 required secrets**:
+Add these **6 required secrets**:
 
 | Secret | Value | Where to find it |
 |--------|-------|------------------|
+| `AWS_ACCESS_KEY_ID` | `AKIAIOSFODNN7...` | AWS IAM User > Security credentials |
+| `AWS_SECRET_ACCESS_KEY` | `wJalrXUtnFEMI...` | AWS IAM User > Security credentials |
+| `AWS_REGION` | `us-east-1` | Your EC2 instance region |
 | `EC2_INSTANCE` | `12.34.56.78` | Your EC2 public IP or DNS |
 | `EC2_USER` | `ec2-user` | Use `ec2-user` for Amazon Linux, `ubuntu` for Ubuntu |
 | `EC2_SSH_PRIVATE_KEY` | `-----BEGIN RSA...` | Full content of your `.pem` file |
@@ -164,6 +167,12 @@ After pushing to main:
    - ✅ Pipeline Summary
 
 ## 🐛 Troubleshooting
+
+### "Credentials could not be loaded"
+- Check `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` are correct
+- Verify IAM user has EC2 permissions
+- Ensure credentials are active
+- Confirm `AWS_REGION` matches your EC2 region
 
 ### "Permission denied (publickey)"
 - Check `EC2_SSH_PRIVATE_KEY` secret includes BEGIN and END lines
