@@ -31,8 +31,8 @@ Add these **6 required secrets**:
 
 | Secret | Value | Where to find it |
 |--------|-------|------------------|
-| `AWS_ACCESS_KEY_ID` | `AKIAIOSFODNN7...` | AWS IAM User > Security credentials |
-| `AWS_SECRET_ACCESS_KEY` | `wJalrXUtnFEMI...` | AWS IAM User > Security credentials |
+| `AWS_ACCESS_ID` | `AKIAIOSFODNN7...` | AWS IAM User > Security credentials |
+| `AWS_ACCESS_KEY` | `wJalrXUtnFEMI...` | AWS IAM User > Security credentials |
 | `AWS_REGION` | `us-east-1` | Your EC2 instance region |
 | `EC2_INSTANCE` | `12.34.56.78` | Your EC2 public IP or DNS |
 | `EC2_USER` | `ec2-user` | Use `ec2-user` for Amazon Linux, `ubuntu` for Ubuntu |
@@ -169,10 +169,13 @@ After pushing to main:
 ## 🐛 Troubleshooting
 
 ### "Credentials could not be loaded"
-- Check `AWS_ACCESS_KEY_ID` and `AWS_SECRET_ACCESS_KEY` are correct
-- Verify IAM user has EC2 permissions
-- Ensure credentials are active
-- Confirm `AWS_REGION` matches your EC2 region
+- **Double-check secret names**: Must be exactly `AWS_ACCESS_ID` and `AWS_ACCESS_KEY` (case-sensitive)
+- **No spaces**: Ensure there are no leading/trailing spaces in secret values
+- **Verify IAM user**: Go to AWS Console > IAM > Users > Your User > Security Credentials
+- **Check permissions**: IAM user needs `AmazonEC2ReadOnlyAccess` at minimum
+- **Ensure credentials are active**: Check they haven't been deleted or rotated
+- **Confirm region**: `AWS_REGION` must match your EC2 region (e.g., `us-east-1`, `us-west-2`)
+- **Re-add secrets**: If nothing works, delete and re-add all three AWS secrets in GitHub
 
 ### "Permission denied (publickey)"
 - Check `EC2_SSH_PRIVATE_KEY` secret includes BEGIN and END lines

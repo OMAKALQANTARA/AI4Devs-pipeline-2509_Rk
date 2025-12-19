@@ -101,12 +101,34 @@ jobs:
       - name: Checkout code
         uses: actions/checkout@v4
 
+      - name: Verify AWS Secrets
+        run: |
+          echo "Checking if AWS secrets are set..."
+          if [ -z "${{ secrets.AWS_ACCESS_ID }}" ]; then
+            echo "❌ AWS_ACCESS_ID secret is not set or is empty"
+            exit 1
+          fi
+          if [ -z "${{ secrets.AWS_ACCESS_KEY }}" ]; then
+            echo "❌ AWS_ACCESS_KEY secret is not set or is empty"
+            exit 1
+          fi
+          if [ -z "${{ secrets.AWS_REGION }}" ]; then
+            echo "❌ AWS_REGION secret is not set or is empty"
+            exit 1
+          fi
+          echo "✅ All AWS secrets are present"
+
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
-          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Verify AWS Credentials Configuration
+        run: |
+          echo "Testing AWS credentials..."
+          aws sts get-caller-identity || echo "⚠️ AWS credentials test failed, but continuing with SSH deployment"
 
       - name: Download backend build artifact
         uses: actions/download-artifact@v4
@@ -181,6 +203,11 @@ jobs:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_ID }}
           aws-secret-access-key: ${{ secrets.AWS_ACCESS_KEY }}
           aws-region: ${{ secrets.AWS_REGION }}
+
+      - name: Verify AWS Credentials Configuration
+        run: |
+          echo "Testing AWS credentials..."
+          aws sts get-caller-identity || echo "⚠️ AWS credentials test failed, but continuing with SSH deployment"
 
       - name: Setup Node.js
         uses: actions/setup-node@v4
