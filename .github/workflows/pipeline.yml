@@ -13,7 +13,7 @@ on:
 jobs:
   # Job 1: Backend Testing
   backend-test:
-    name: Backend Tests
+    name: Backend Tests 
     runs-on: ubuntu-latest
     
     steps:
