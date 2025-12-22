@@ -167,7 +167,7 @@ jobs:
           # Install production dependencies and restart backend service
           ssh -i deploy_key.pem -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST << 'EOF'
             cd $BACKEND_DEPLOY_PATH
-            npm ci --omit=dev
+            npm install --omit=dev
             # Restart backend service (uncomment and adjust based on your setup)
             # pm2 restart backend || pm2 start dist/index.js --name backend
             # OR systemctl restart backend
