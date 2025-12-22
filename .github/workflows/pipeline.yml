@@ -165,13 +165,11 @@ jobs:
           scp -i deploy_key.pem -o StrictHostKeyChecking=no -r backend/prisma $EC2_USER@$EC2_HOST:$BACKEND_DEPLOY_PATH/
           
           # Install production dependencies and restart backend service
-          ssh -i deploy_key.pem -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST << 'EOF'
-            cd $BACKEND_DEPLOY_PATH
-            npm install --omit=dev
-            # Restart backend service (uncomment and adjust based on your setup)
-            # pm2 restart backend || pm2 start dist/index.js --name backend
-            # OR systemctl restart backend
-          EOF
+          ssh -i deploy_key.pem -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "cd $BACKEND_DEPLOY_PATH && npm install --omit=dev"
+          # Restart backend service (uncomment and adjust based on your setup)
+          # ssh -i deploy_key.pem -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "cd $BACKEND_DEPLOY_PATH && pm2 restart backend || pm2 start dist/index.js --name backend"
+          # OR
+          # ssh -i deploy_key.pem -o StrictHostKeyChecking=no $EC2_USER@$EC2_HOST "sudo systemctl restart backend"
           
           # Clean up
           rm -f deploy_key.pem
